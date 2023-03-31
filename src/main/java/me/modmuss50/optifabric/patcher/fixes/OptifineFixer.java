@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import me.modmuss50.optifabric.mod.OptifabricSetup;
 import net.fabricmc.loader.api.FabricLoader;
 
 import me.modmuss50.optifabric.compat.fabricrenderingfluids.FluidRendererFix;
@@ -42,6 +43,11 @@ public class OptifineFixer {
 
 		//net/minecraft/client/render/model/json/ModelOverrideList
 		registerFix("class_806", new ModelOverrideListFix());
+
+		if (OptifabricSetup.isPresent("minecraft", ">=1.18.2")) {
+			//net/minecraft/client/option/GameOptions
+			registerFix("class_315", new GameOptionsFix());
+		}
 
 		if (FabricLoader.getInstance().isModLoaded("fabric-rendering-fluids-v1")) {
 			//net/minecraft/client/render/block/FluidRenderer

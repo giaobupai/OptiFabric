@@ -532,7 +532,7 @@ public class OptifabricSetup implements Runnable {
 		return FabricLoader.getInstance().isModLoaded(modID);
 	}
 
-	static boolean isPresent(String modID, String versionRange) {
+	public static boolean isPresent(String modID, String versionRange) {
 		return isPresent(modID, modMetadata -> compareVersions(versionRange, modMetadata));
 	}
 
