@@ -9,9 +9,18 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 
 public class ASMUtils {
+	public static boolean isWideType(Type type) {
+		return type.equals(Type.LONG_TYPE) || type.equals(Type.DOUBLE_TYPE);
+	}
+
+	public static boolean isWideType(String type) {
+		return isWideType(Type.getType(type));
+	}
+
 	public static ClassNode readClass(byte[] bytes) {
 		return readClass(new ClassReader(Objects.requireNonNull(bytes, "Cannot read null class bytes")));
 	}
