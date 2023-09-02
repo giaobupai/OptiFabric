@@ -2,6 +2,7 @@ package me.modmuss50.optifabric.patcher.fixes;
 
 import java.util.ListIterator;
 
+import me.modmuss50.optifabric.mod.OptifabricSetup;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -53,7 +54,7 @@ public class ChunkRendererFix implements ClassFixer {
 								+ "ZL" + (!nativeRandom ? "net/minecraft/class_5819;)V" : "java/util/Random;)Z");
 							String name = RemappingUtils.getMethodName("class_776", "method_3355", desc);
 
-							System.out.println(String.format("Replacement `renderBlock` call:  %s.%s", name, desc));
+							OptifabricSetup.LOGGER.info("Replacement `renderBlock` call:  {}.{}", name, desc);
 	
 							//Replaces the method call with the vanilla one, this calls down to the same method just without the forge model data
 							methodInsnNode.name = name;

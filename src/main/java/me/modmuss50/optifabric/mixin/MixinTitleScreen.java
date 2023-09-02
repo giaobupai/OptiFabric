@@ -47,6 +47,21 @@ public abstract class MixinTitleScreen extends Screen {
 
 			String actionButtonText, helpButtonText;
 			BooleanConsumer action;
+			//TODO: refactor (almost) everything here
+			if (OptifabricError.modError) {
+				String stack = OptifabricError.getErrorLog();
+				actionButtonText = stack != null ? "Copy stack-trace" : "Open logs folder";
+				helpButtonText = "Open issues";
+				action = help -> {
+					if (help) {
+						Util.getOperatingSystem().open("https://github.com/Chocohead/OptiFabric/issues");
+					} else if (stack != null) {
+						client.keyboard.setClipboard(stack);
+					} else {
+						Util.getOperatingSystem().open(new File(FabricLoader.getInstance().getGameDirectory(), "logs"));
+					}
+				};
+			} else {
 			switch (OptifineVersion.jarType) {
 			case SOMETHING_ELSE: //Valid jar states, we shouldn't be here
 			case OPTIFINE_INSTALLER:
@@ -83,6 +98,7 @@ public abstract class MixinTitleScreen extends Screen {
 					}
 				};
 				break;
+			}
 			}
 			}
 

@@ -6,6 +6,8 @@ import java.io.StringWriter;
 public class OptifabricError {
 	private static String error;
 	private static String stack;
+	//TODO: handle mod errors separately
+	public static boolean modError;
 
 	public static boolean hasError() {
 		return error != null;

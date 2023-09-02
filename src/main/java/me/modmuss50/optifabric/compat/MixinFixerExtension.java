@@ -1,19 +1,23 @@
 package me.modmuss50.optifabric.compat;
 
+import me.modmuss50.optifabric.mod.OptifabricError;
+import me.modmuss50.optifabric.mod.OptifabricSetup;
 import me.modmuss50.optifabric.util.MixinInternals;
 import org.apache.commons.lang3.tuple.Pair;
-import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.*;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import org.spongepowered.asm.mixin.injection.throwables.InjectionError;
 import org.spongepowered.asm.mixin.transformer.ext.IExtension;
 import org.spongepowered.asm.mixin.transformer.ext.ITargetClassContext;
 
-import java.util.Collections;
-import java.util.Set;
-import java.util.WeakHashMap;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class MixinFixerExtension implements IExtension {
-	private static final Set<ClassNode> PREPARED_MIXINS = Collections.newSetFromMap(new WeakHashMap<>());
+	private static final Set<ClassNode> PRE_MIXINS = Collections.newSetFromMap(new WeakHashMap<>());
+	private static final Set<ClassNode> POST_MIXINS = Collections.newSetFromMap(new WeakHashMap<>());
 
 	@Override
 	public boolean checkActive(MixinEnvironment environment) {
@@ -22,6 +26,7 @@ public class MixinFixerExtension implements IExtension {
 
 	@Override
 	public void preApply(ITargetClassContext context) {
+		if (OptifabricError.hasError()) return;
 		for (Pair<IMixinInfo, ClassNode> pair : MixinInternals.getMixinsFor(context)) {
 			prepareMixin(pair.getLeft(), pair.getRight());
 		}
@@ -29,7 +34,9 @@ public class MixinFixerExtension implements IExtension {
 
 	@Override
 	public void postApply(ITargetClassContext context) {
-
+		for (Pair<IMixinInfo, ClassNode> pair : MixinInternals.getMixinsFor(context)) {
+			handleErrorInjectors(pair.getLeft(), pair.getRight(), context);
+		}
 	}
 
 	@Override
@@ -38,11 +45,48 @@ public class MixinFixerExtension implements IExtension {
 	}
 
 	private static void prepareMixin(IMixinInfo mixinInfo, ClassNode mixinNode) {
-		if (PREPARED_MIXINS.contains(mixinNode)) {
+		if (PRE_MIXINS.contains(mixinNode)) {
 			// Don't scan the whole class again.
 			return;
 		}
 		ModMixinFixer.INSTANCE.getFixers(mixinInfo.getClassName()).forEach(transformer -> transformer.fix(mixinInfo, mixinNode));
-		PREPARED_MIXINS.add(mixinNode);
+		PRE_MIXINS.add(mixinNode);
+	}
+
+	//this could use some refactoring
+	private static void handleErrorInjectors(IMixinInfo mixinInfo, ClassNode mixinNode, ITargetClassContext context) {
+		if (POST_MIXINS.contains(mixinNode)) {
+			return;
+		}
+		ClassNode classNode = context.getClassNode();
+
+		List<String> methods = classNode.methods.stream().map(method -> method.name).collect(Collectors.toList());
+		//check for error methods
+		for (MethodNode method : classNode.methods) {
+			if (method.name.endsWith("$missing") && methods.stream().anyMatch(name -> (name + "$missing").equals(method.name))) {
+				for (AbstractInsnNode insn : method.instructions) {
+					if (insn instanceof LdcInsnNode) {
+						String error = (String) ((LdcInsnNode) insn).cst;
+						if (!OptifabricError.hasError()) {
+							OptifabricError.setError(new InjectionError(error), getError(mixinInfo, method));
+							OptifabricError.modError = true;
+						}
+						break;
+					}
+				}
+				OptifabricSetup.LOGGER.warn("Removed InjectionException from Error Injector method " + method.name);
+				method.instructions.clear();
+				method.instructions.add(new InsnNode(Opcodes.RETURN));
+			}
+		}
+		POST_MIXINS.add(mixinNode);
+	}
+
+	private static String getError(IMixinInfo mixinInfo, MethodNode method) {
+		boolean compat = !ModMixinFixer.INSTANCE.getFixers(mixinInfo.getClassName()).isEmpty();
+		return String.format("Injector method %s in %s couldn't apply due to " +
+				(compat ? "outdated compatibility patch" : "missing compatibility patch!") +
+				" Please report this issue.",
+				method.name, mixinInfo, mixinInfo.getConfig());
 	}
 }

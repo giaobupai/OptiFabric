@@ -111,7 +111,7 @@ public class OptifineVersion {
 			}
 		} catch (IOException | IllegalStateException e) {
 			OptifabricError.setError(e, "Failed to find current minecraft version, please report this");
-			e.printStackTrace();
+			OptifabricSetup.LOGGER.error(e);
 			return JarType.INTERNAL_ERROR;
 		}
 

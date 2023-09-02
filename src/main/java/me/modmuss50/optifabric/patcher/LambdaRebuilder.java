@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Runnables;
 
+import me.modmuss50.optifabric.mod.OptifabricSetup;
 import org.apache.commons.lang3.tuple.Pair;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
@@ -204,7 +205,7 @@ public class LambdaRebuilder implements IMappingProvider, Closeable {
 
 						//They're not the same exact methods, but they might produce the same result in such a way that it doesn't matter (this ignores the case where equivalently looking lambdas are switched)
 						if (originalSplit != patchedSplit || !originalLambda.method.regionMatches(0, patchedLambda.method, 0, originalSplit) || !Type.getReturnType(originalLambda.method).equals(Type.getReturnType(patchedLambda.method))) break out;
-						//System.out.printf("Proposing fuzzing %s as %s, producing %s <= %s%n", patchedLambda.method, originalLambda.method, originalLambda.getFullName(), patchedLambda.getName());
+						//OptifabricSetup.LOGGER.info("Proposing fuzzing {} as {}, producing {} <= {}", patchedLambda.method, originalLambda.method, originalLambda.getFullName(), patchedLambda.getName());
 						if (!Objects.equals(originalLambda.owner, patchedLambda.owner)) break out; //They're not likely to be the same
 					}
 				}
@@ -307,10 +308,10 @@ public class LambdaRebuilder implements IMappingProvider, Closeable {
 		boolean vague = !from.desc.equals(to.desc); //Are we trying to fudge a fix?
 
 		if (vague && !ALLOW_VAGUE_EQUIVALENCE) {
-			System.err.println("Description changed remapping lambda handle: " + className + '#' + from.name + from.desc + " => " + className + '#' + to.name + to.desc);
+			OptifabricSetup.LOGGER.warn("Description changed remapping lambda handle: {}#{}{} => {}#{}{}", className, from.name, from.desc, className, to.name, to.desc);
 			return false; //Don't add the fix if it is wrong
 		} else if (vague) {
-			System.out.printf("Fuzzing %s#%s%s as %s%s%n", className, from.name, from.desc, to.name, to.desc);
+			OptifabricSetup.LOGGER.warn("Fuzzing {}#{}{} as {}{}", className, from.name, from.desc, to.name, to.desc);
 
 			fuzzes.put(new Member(className, from.name, from.desc), Pair.of(to.name, to.desc));
 		} else {

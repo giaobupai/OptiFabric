@@ -10,6 +10,8 @@ import com.google.common.base.MoreObjects;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -37,6 +39,7 @@ import com.chocohead.mm.api.ClassTinkerers;
 public class OptifabricSetup implements Runnable {
 	public static File optifineRuntimeJar = null;
 	public static boolean usingScreenAPI;
+	public static final Logger LOGGER = LogManager.getLogger("OptiFabric");
 
 	//This is called early on to allow us to get the transformers in beofore minecraft starts
 	@Override
@@ -56,8 +59,7 @@ public class OptifabricSetup implements Runnable {
 				OptifineVersion.jarType = JarType.INTERNAL_ERROR;
 				OptifabricError.setError(e, "Failed to load OptiFine, please report this!\n\n" + e.getMessage());
 			}
-			System.err.println("Failed to setup optifine:");
-			e.printStackTrace();
+			LOGGER.error("Failed to setup optifine: ", e);
 			return; //Avoid crashing out any other Fabric ASM users
 		}
 
@@ -561,8 +563,7 @@ public class OptifabricSetup implements Runnable {
 			SemanticVersionImpl version = new SemanticVersionImpl(mod.getVersion().getFriendlyString(), false);
 			return predicate.test(version);
 		} catch (@SuppressWarnings("deprecation") net.fabricmc.loader.util.version.VersionParsingException e) {
-			System.err.println("Error comparing the version for ".concat(MoreObjects.firstNonNull(mod.getName(), mod.getId())));
-			e.printStackTrace();
+			LOGGER.error("Error comparing the version for ".concat(MoreObjects.firstNonNull(mod.getName(), mod.getId())), e);
 			return false; //Let's just gamble on the version not being valid also not being a problem
 		}
 	}

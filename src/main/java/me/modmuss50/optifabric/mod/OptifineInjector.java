@@ -40,7 +40,7 @@ public class OptifineInjector {
 		Consumer<ClassNode> transformer = target -> {
 			//Avoid double patching things, not that this should happen
 			if (!patched.add(target.name)) {
-				System.err.println("Already patched " + target.name);
+				OptifabricSetup.LOGGER.error("Already patched " + target.name);
 				return;
 			}
 
