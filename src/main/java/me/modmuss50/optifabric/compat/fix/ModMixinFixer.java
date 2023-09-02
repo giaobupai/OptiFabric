@@ -1,4 +1,4 @@
-package me.modmuss50.optifabric.compat;
+package me.modmuss50.optifabric.compat.fix;
 
 import com.google.common.collect.Lists;
 import me.modmuss50.optifabric.util.ASMUtils;
@@ -17,30 +17,30 @@ import java.util.stream.Collectors;
 public class ModMixinFixer {
 	public static final ModMixinFixer INSTANCE = new ModMixinFixer();
 
-	private final Map<String, List<IMixinFixer>> classFixes = new HashMap<>();
+	private final List<IMixinFixer> classFixes = new ArrayList<>();
 
 	private ModMixinFixer() {
 	}
 
-	public void addFixer(String mixinClass, IMixinFixer fixer) {
-		classFixes.computeIfAbsent(mixinClass, s -> new ArrayList<>()).add(fixer);
+	public void addFixer(IMixinFixer fixer) {
+		classFixes.add(fixer);
 	}
 
 	public List<IMixinFixer> getFixers(String className) {
-		return classFixes.getOrDefault(className.replace('.', '/'), Collections.emptyList());
+		return classFixes.stream().filter(fixer -> fixer.getTargets().contains(className.replace('.', '/'))).collect(Collectors.toList());
 	}
 
 	static IntSupplier getIndexCI(MethodNode method, boolean afterSequence, String... sequence) {
-		return getIndex(method.desc, true, afterSequence, String.join("", sequence));
+		return getIndex(method, true, afterSequence, String.join("", sequence));
 	}
 
 	static IntSupplier getIndex(MethodNode method, boolean afterSequence, String... sequence) {
-		return getIndex(method.desc, false, afterSequence, String.join("", sequence));
+		return getIndex(method, false, afterSequence, String.join("", sequence));
 	}
 
-	private static IntSupplier getIndex(String methodDesc, boolean afterCallback, boolean afterSequence, String sequence) {
+	private static IntSupplier getIndex(MethodNode method, boolean afterCallback, boolean afterSequence, String sequence) {
 		return () -> {
-			String desc = methodDesc;
+			String desc = method.desc;
 			int offset = 0;
 			if (afterCallback) {
 				List<Type> params = Lists.newArrayList(Type.getArgumentTypes(desc));
@@ -52,12 +52,19 @@ public class ModMixinFixer {
 				}
 				desc = params.subList(offset, params.size()).stream().map(Type::toString).collect(Collectors.joining(""));
 			}
-			if (afterSequence) offset++;
-			desc = desc.split(sequence)[afterSequence ? 1 : 0];
+			int index = desc.indexOf(sequence);
+			if (index == -1) {
+				return -1;
+			}
+			desc = afterSequence ? desc.substring(index) : desc.substring(0, index);
 			if (!desc.contains("(")) desc = "(" + desc;
 			if (!desc.contains(")")) desc = desc + ")V";
 			return Type.getArgumentTypes(desc).length + offset;
 		};
+	}
+
+	static void addParams(MethodNode method, IMixinInfo mixinInfo, String... params) {
+		insertParams(method, mixinInfo, Type.getArgumentTypes(method.desc).length, params);
 	}
 
 	static void insertParams(MethodNode method, IMixinInfo mixinInfo, IntSupplier index, String... params) {

@@ -1,5 +1,6 @@
 package me.modmuss50.optifabric.compat;
 
+import me.modmuss50.optifabric.compat.fix.ModMixinFixer;
 import me.modmuss50.optifabric.mod.OptifabricError;
 import me.modmuss50.optifabric.mod.OptifabricSetup;
 import org.apache.logging.log4j.Level;
@@ -23,7 +24,7 @@ public class OptifabricMixinErrorHandler implements IMixinErrorHandler {
 		boolean compat = !ModMixinFixer.INSTANCE.getFixers(mixin.getClassName()).isEmpty();
 		Level level = action == ErrorAction.ERROR ? Level.ERROR : Level.WARN;
 		IMixinConfig config = mixin.getConfig();
-		String msg = String.format(getMessage(apply, compat), mixin, config.getName(), FabricUtil.getModId(config));
+		String msg = String.format(getMessage(apply, compat), mixin.getName(), config.getName(), FabricUtil.getModId(config));
 		OptifabricSetup.LOGGER.log(level, msg);
 		//TODO: make this support more than one error and separate OptiFine errors from mod errors
 		if (!OptifabricError.hasError()) {

@@ -1,14 +1,18 @@
 package me.modmuss50.optifabric.compat;
 
+import me.modmuss50.optifabric.compat.fix.IMixinFixer;
+import me.modmuss50.optifabric.compat.fix.ModMixinFixer;
 import me.modmuss50.optifabric.mod.OptifabricError;
 import me.modmuss50.optifabric.mod.OptifabricSetup;
 import me.modmuss50.optifabric.util.MixinInternals;
+import me.modmuss50.optifabric.util.MixinUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import org.spongepowered.asm.mixin.injection.throwables.InjectionError;
+import org.spongepowered.asm.mixin.transformer.ClassInfo;
 import org.spongepowered.asm.mixin.transformer.ext.IExtension;
 import org.spongepowered.asm.mixin.transformer.ext.ITargetClassContext;
 
@@ -18,6 +22,7 @@ import java.util.stream.Collectors;
 public class MixinFixerExtension implements IExtension {
 	private static final Set<ClassNode> PRE_MIXINS = Collections.newSetFromMap(new WeakHashMap<>());
 	private static final Set<ClassNode> POST_MIXINS = Collections.newSetFromMap(new WeakHashMap<>());
+	private static final HashMap<String, Boolean> CLASS_INFO_UPDATES = new HashMap<>();
 
 	@Override
 	public boolean checkActive(MixinEnvironment environment) {
@@ -30,6 +35,7 @@ public class MixinFixerExtension implements IExtension {
 		for (Pair<IMixinInfo, ClassNode> pair : MixinInternals.getMixinsFor(context)) {
 			prepareMixin(pair.getLeft(), pair.getRight());
 		}
+		updateClassInfo(context.getClassInfo(), context.getClassNode());
 	}
 
 	@Override
@@ -49,8 +55,19 @@ public class MixinFixerExtension implements IExtension {
 			// Don't scan the whole class again.
 			return;
 		}
-		ModMixinFixer.INSTANCE.getFixers(mixinInfo.getClassName()).forEach(transformer -> transformer.fix(mixinInfo, mixinNode));
+		List<IMixinFixer> fixers = ModMixinFixer.INSTANCE.getFixers(mixinInfo.getClassName());
+		fixers.forEach(fixer -> fixer.fix(mixinInfo, mixinNode));
+		if (fixers.stream().anyMatch(IMixinFixer::shouldUpdateClassInfo)) {
+			mixinInfo.getTargetClasses().forEach(target -> CLASS_INFO_UPDATES.put(target, false));
+		}
 		PRE_MIXINS.add(mixinNode);
+	}
+
+	public void updateClassInfo(ClassInfo info, ClassNode node) {
+		if (!CLASS_INFO_UPDATES.getOrDefault(info.getName(), true)) {
+			MixinUtils.completeClassInfo(info, node.methods);
+			CLASS_INFO_UPDATES.put(info.getName(), true);
+		}
 	}
 
 	//this could use some refactoring
