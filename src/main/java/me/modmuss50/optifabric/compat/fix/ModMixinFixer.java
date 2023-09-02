@@ -20,6 +20,7 @@ public class ModMixinFixer {
 	private final List<IMixinFixer> classFixes = new ArrayList<>();
 
 	private ModMixinFixer() {
+		addFixer(new ModelLoaderBakerImplFixer());
 	}
 
 	public void addFixer(IMixinFixer fixer) {
