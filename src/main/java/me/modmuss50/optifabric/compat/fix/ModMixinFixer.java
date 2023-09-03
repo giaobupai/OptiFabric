@@ -65,45 +65,44 @@ public class ModMixinFixer {
 	}
 
 	static void addParams(MethodNode method, IMixinInfo mixinInfo, String... params) {
-		insertParams(method, mixinInfo, Type.getArgumentTypes(method.desc).length, params);
+		insertParams(method, mixinInfo, Type.getArgumentTypes(method.desc).length, toTypeList(params));
 	}
 
 	static void insertParams(MethodNode method, IMixinInfo mixinInfo, IntSupplier index, String... params) {
-		insertParams(method, mixinInfo, index.getAsInt(), params);
+		insertParams(method, mixinInfo, index.getAsInt(), toTypeList(params));
 	}
 
-	static void insertParams(MethodNode method, IMixinInfo mixinInfo, int index, String... params) {
+	static void insertParams(MethodNode method, IMixinInfo mixinInfo, int index, List<Type> params) {
 		List<Type> newDesc = Arrays.stream(Type.getArgumentTypes(method.desc)).collect(Collectors.toList());
-		newDesc.addAll(index, Arrays.stream(params).map(Type::getType).collect(Collectors.toList()));
+		newDesc.addAll(index, params);
 		int shiftBy = 0;
-		for (String param : params) {
-			shiftBy++;
-			if (ASMUtils.isWideType(param)) shiftBy++;
+		int lvIndex = 0;
+		for (Type param : params) {
+			shiftBy += param.getSize();
 		}
 		method.maxLocals += shiftBy;
 
-		for (int i = 0; i < params.length; i++) {
+		for (int i = 0; i < params.size(); i++) {
 			method.parameters.add(index + i, new ParameterNode("syn_" + i, Opcodes.ACC_SYNTHETIC));
 		}
 
-		for (int i = index; i > 0; i--) {
-			if (ASMUtils.isWideType(newDesc.get(i))) {
-				index++;
-			}
+		if (!Modifier.isStatic(method.access)) lvIndex++;
+
+		for (int i = 0; i < index; i++) {
+			lvIndex += newDesc.get(i).getSize();
 		}
-		if (!Modifier.isStatic(method.access)) index++;
 
 		//shift locals (not mandatory)
 		for (LocalVariableNode local : method.localVariables) {
-			if (local.index >= index) {
+			if (local.index >= lvIndex) {
 				local.index += shiftBy;
 			}
 		}
 		//shift instructions
 		for (AbstractInsnNode insn : method.instructions) {
-			if (insn instanceof VarInsnNode && ((VarInsnNode) insn).var >= index) {
+			if (insn instanceof VarInsnNode && ((VarInsnNode) insn).var >= lvIndex) {
 				((VarInsnNode) insn).var += shiftBy;
-			} else if (insn instanceof IincInsnNode && ((IincInsnNode) insn).var >= index) {
+			} else if (insn instanceof IincInsnNode && ((IincInsnNode) insn).var >= lvIndex) {
 				((IincInsnNode) insn).var += shiftBy;
 			}
 		}
@@ -113,5 +112,9 @@ public class ModMixinFixer {
 		methods.removeIf(meth -> method.name.equals(meth.getOriginalName()) && method.desc.equals(meth.getOriginalDesc()));
 		method.desc = Type.getMethodDescriptor(Type.getReturnType(method.desc), newDesc.toArray(new Type[0]));
 		methods.add(info.new Method(method, true));
+	}
+
+	private static List<Type> toTypeList(String[] types) {
+		return Arrays.stream(types).map(Type::getType).collect(Collectors.toList());
 	}
 }
