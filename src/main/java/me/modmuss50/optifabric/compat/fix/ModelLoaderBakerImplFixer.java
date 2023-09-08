@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static me.modmuss50.optifabric.compat.fix.ModMixinFixer.addParams;
+import static me.modmuss50.optifabric.util.MixinFixerUtils.addParams;
 
 public class ModelLoaderBakerImplFixer implements IMixinFixer {
 	@Override
@@ -22,10 +22,11 @@ public class ModelLoaderBakerImplFixer implements IMixinFixer {
 
 	@Override
 	public void fix(IMixinInfo mixinInfo, ClassNode mixinNode) {
+		String bakeDesc = RemappingUtils.mapMethodDescriptor("(Lnet/minecraft/class_2960;Lnet/minecraft/class_3665;Ljava/util/function/Function;)Lnet/minecraft/class_1087;");
+		String optifineBake = 'L' + RemappingUtils.getClassName("class_1088$class_7778") + ";bake" + bakeDesc;
 		for (MethodNode method : mixinNode.methods) {
 			List<String> injectMethod = new ArrayList<>();
-			String bakeDesc = RemappingUtils.mapMethodDescriptor("(Lnet/minecraft/class_2960;Lnet/minecraft/class_3665;Ljava/util/function/Function;)Lnet/minecraft/class_1087;");
-			injectMethod.add('L' + RemappingUtils.getClassName("class_1088$class_7778") + ";bake" + bakeDesc); //optifine method
+			injectMethod.add(optifineBake);
 			AnnotationNode annotation;
 			switch (method.name) {
 				case "invokeModifyBeforeBake":

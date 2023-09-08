@@ -104,6 +104,6 @@ public class MixinFixerExtension implements IExtension {
 		return String.format("Injector method %s in %s couldn't apply due to " +
 				(compat ? "outdated compatibility patch" : "missing compatibility patch!") +
 				" Please report this issue.",
-				method.name, mixinInfo, mixinInfo.getConfig());
+				method.name, mixinInfo);
 	}
 }
