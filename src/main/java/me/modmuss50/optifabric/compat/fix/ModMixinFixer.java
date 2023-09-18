@@ -1,5 +1,7 @@
 package me.modmuss50.optifabric.compat.fix;
 
+import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -17,7 +19,7 @@ public class ModMixinFixer {
 		classFixes.add(fixer);
 	}
 
-	public List<IMixinFixer> getFixers(String className) {
-		return classFixes.stream().filter(fixer -> fixer.getTargets().contains(className.replace('.', '/'))).collect(Collectors.toList());
+	public List<IMixinFixer> getFixers(IMixinInfo mixin) {
+		return classFixes.stream().filter(fixer -> fixer.getTargets().contains(mixin.getClassRef())).collect(Collectors.toList());
 	}
 }

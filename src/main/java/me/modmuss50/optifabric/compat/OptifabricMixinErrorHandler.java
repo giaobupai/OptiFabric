@@ -21,7 +21,7 @@ public class OptifabricMixinErrorHandler implements IMixinErrorHandler {
 	}
 
 	private static ErrorAction handleError(IMixinInfo mixin, ErrorAction action, Throwable th, boolean apply) {
-		boolean compat = !ModMixinFixer.INSTANCE.getFixers(mixin.getClassName()).isEmpty();
+		boolean compat = !ModMixinFixer.INSTANCE.getFixers(mixin).isEmpty();
 		Level level = action == ErrorAction.ERROR ? Level.ERROR : Level.WARN;
 		IMixinConfig config = mixin.getConfig();
 		String msg = String.format(getMessage(apply, compat), mixin.getName(), config.getName(), FabricUtil.getModId(config));

@@ -1,6 +1,5 @@
 package me.modmuss50.optifabric.compat;
 
-import me.modmuss50.optifabric.compat.fix.IMixinFixer;
 import me.modmuss50.optifabric.compat.fix.ModMixinFixer;
 import me.modmuss50.optifabric.mod.OptifabricError;
 import me.modmuss50.optifabric.mod.OptifabricSetup;
@@ -55,9 +54,9 @@ public class MixinFixerExtension implements IExtension {
 			// Don't scan the whole class again.
 			return;
 		}
-		List<IMixinFixer> fixers = ModMixinFixer.INSTANCE.getFixers(mixinInfo.getClassName());
-		fixers.forEach(fixer -> fixer.fix(mixinInfo, mixinNode));
-		if (fixers.stream().anyMatch(IMixinFixer::shouldUpdateClassInfo)) {
+		MixinNodeTransformer transformer = new MixinNodeTransformer(mixinInfo, mixinNode);
+		ModMixinFixer.INSTANCE.getFixers(mixinInfo).forEach(fixer -> fixer.fix(transformer));
+		if (transformer.shouldUpdateClassInfo()) {
 			mixinInfo.getTargetClasses().forEach(target -> CLASS_INFO_UPDATES.put(target, false));
 		}
 		PRE_MIXINS.add(mixinNode);
@@ -100,7 +99,7 @@ public class MixinFixerExtension implements IExtension {
 	}
 
 	private static String getError(IMixinInfo mixinInfo, MethodNode method) {
-		boolean compat = !ModMixinFixer.INSTANCE.getFixers(mixinInfo.getClassName()).isEmpty();
+		boolean compat = !ModMixinFixer.INSTANCE.getFixers(mixinInfo).isEmpty();
 		return String.format("Injector method %s in %s couldn't apply due to " +
 				(compat ? "outdated compatibility patch" : "missing compatibility patch!") +
 				" Please report this issue.",
