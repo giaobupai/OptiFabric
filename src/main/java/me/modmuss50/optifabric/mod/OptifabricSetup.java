@@ -2,7 +2,6 @@ package me.modmuss50.optifabric.mod;
 
 import java.io.File;
 import java.util.Optional;
-import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -40,8 +39,13 @@ public class OptifabricSetup implements Runnable {
 	public static File optifineRuntimeJar = null;
 	public static boolean usingScreenAPI;
 	public static final Logger LOGGER = LogManager.getLogger("OptiFabric");
+	public static boolean particlesPresent;
+	public static boolean farPlanePresent;
+	public static boolean setupFogPresent;
+	public static boolean createRegionPresent;
+	public static boolean generateCachePresent;
 
-	//This is called early on to allow us to get the transformers in beofore minecraft starts
+	//This is called early on to allow us to get the transformers in before minecraft starts
 	@Override
 	public void run() {
 		OptifineInjector injector;
@@ -63,63 +67,42 @@ public class OptifabricSetup implements Runnable {
 			return; //Avoid crashing out any other Fabric ASM users
 		}
 
-		BooleanSupplier particlesPresent = new FeatureFinder() {
-			@Override
-			protected boolean isPresent() {
-				return injector.predictFuture(RemappingUtils.getClassName("class_702")).filter(node -> {//ParticleManager
-					//(MatrixStack, VertexConsumerProvider$Immediate, LightmapTextureManager, Camera, Frustum)
-					String desc = RemappingUtils.mapMethodDescriptor("(Lnet/minecraft/class_4587;Lnet/minecraft/class_4597$class_4598;"
-							+ "Lnet/minecraft/class_765;Lnet/minecraft/class_4184;FLnet/minecraft/class_4604;)V");
+		particlesPresent = injector.predictFuture(RemappingUtils.getClassName("class_702")).filter(node -> {//ParticleManager
+			//(MatrixStack, VertexConsumerProvider$Immediate, LightmapTextureManager, Camera, Frustum)
+			String desc = RemappingUtils.mapMethodDescriptor("(Lnet/minecraft/class_4587;Lnet/minecraft/class_4597$class_4598;"
+					+ "Lnet/minecraft/class_765;Lnet/minecraft/class_4184;FLnet/minecraft/class_4604;)V");
 
-					for (MethodNode method : node.methods) {
-						if (("renderParticles".equals(method.name) || "render".equals(method.name)) && desc.equals(method.desc)) {
+			for (MethodNode method : node.methods) {
+				if (("renderParticles".equals(method.name) || "render".equals(method.name)) && desc.equals(method.desc)) {
+					return true;
+				}
+			}
+
+			return false;
+		}).isPresent();
+		farPlanePresent = injector.predictFuture(RemappingUtils.getClassName("class_757")).filter(node -> {//GameRenderer
+			String render = RemappingUtils.getMethodName("class_757", "method_3192", "(FJZ)V");
+
+			for (MethodNode method : node.methods) {
+				if (render.equals(method.name) && "(FJZ)V".equals(method.desc)) {
+					for (AbstractInsnNode insn : method.instructions) {
+						if (insn.getType() == AbstractInsnNode.FIELD_INSN && "ForgeHooksClient_getGuiFarPlane".equals(((FieldInsnNode) insn).name)) {
 							return true;
 						}
 					}
 
-					return false;
-				}).isPresent();
+					break;
+				}
 			}
-		};
-		BooleanSupplier farPlanePresent = new FeatureFinder() {
-			@Override
-			protected boolean isPresent() {
-				return injector.predictFuture(RemappingUtils.getClassName("class_757")).filter(node -> {//GameRenderer
-					String render = RemappingUtils.getMethodName("class_757", "method_3192", "(FJZ)V");
 
-					for (MethodNode method : node.methods) {
-						if (render.equals(method.name) && "(FJZ)V".equals(method.desc)) {
-							for (AbstractInsnNode insn : method.instructions) {
-								if (insn.getType() == AbstractInsnNode.FIELD_INSN && "ForgeHooksClient_getGuiFarPlane".equals(((FieldInsnNode) insn).name)) {
-									return true;
-								}
-							}
-
-							break;
-						}
-					}
-
-					return false;
-				}).isPresent();
-			}
-		};
-		BooleanSupplier setupFogPresent = new FeatureFinder() {
-			@Override
-			protected boolean isPresent() {
-				return injector.predictFuture(RemappingUtils.getClassName("class_758")).filter(node -> {//BackgroundRenderer
-					//(Camera, BackgroundRenderer$FogType)
-					String desc = RemappingUtils.mapMethodDescriptor("(Lnet/minecraft/class_4184;Lnet/minecraft/class_758$class_4596;FZF)V");
-
-					for (MethodNode method : node.methods) {
-						if ("setupFog".equals(method.name) && desc.equals(method.desc)) {
-							return true;
-						}
-					}
-
-					return false;
-				}).isPresent();
-			}
-		};
+			return false;
+		}).isPresent();
+		setupFogPresent = injector.isMethodPresent("class_758", "setupFog",   //BackgroundRenderer
+				"(Lnet/minecraft/class_4184;Lnet/minecraft/class_758$class_4596;FZF)V"); //Camera, FogType
+		String chunkDesc = "(Lnet/minecraft/class_1937;Lnet/minecraft/class_2338;Lnet/minecraft/class_2338;IZ)" +
+				"Lnet/minecraft/class_853;"; //(World, BlockPos, BlockPos)ChunkRendererRegion
+		createRegionPresent = injector.isMethodPresent("class_6850", "createRegion", chunkDesc);
+		generateCachePresent = injector.isMethodPresent("class_853", "generateCache", chunkDesc);
 
 		if (isPresent("fabric-renderer-api-v1")) {
 			if (isPresent("minecraft", ">=1.19")) {
@@ -129,7 +112,7 @@ public class OptifabricSetup implements Runnable {
 			}
 		}
 
-		if (isPresent("fabric-rendering-v1", ">=1.5.0") && particlesPresent.getAsBoolean()) {
+		if (isPresent("fabric-rendering-v1", ">=1.5.0") && particlesPresent) {
 			if (isPresent("minecraft", ">=1.19.3")) {
 				Mixins.addConfiguration("optifabric.compat.fabric-rendering.new-mixins.json");
 			} else {
@@ -142,34 +125,6 @@ public class OptifabricSetup implements Runnable {
 
 		if (isPresent("fabric-rendering-data-attachment-v1")) {
 			Mixins.addConfiguration("optifabric.compat.fabric-rendering-data.mixins.json");
-
-			if (isPresent("fabric-rendering-data-attachment-v1", ">0.3.0")) {
-				//0.43.1+ and with a patch to ChunkRendererRegionBuilder
-				injector.predictFuture(RemappingUtils.getClassName("class_6850")).ifPresent(node -> {//ChunkRendererRegionBuilder, (World, BlockPos, BlockPos)ChunkRendererRegion
-					String desc = RemappingUtils.mapMethodDescriptor("(Lnet/minecraft/class_1937;Lnet/minecraft/class_2338;Lnet/minecraft/class_2338;IZ)Lnet/minecraft/class_853;");
-
-					for (MethodNode method : node.methods) {
-						if ("createRegion".equals(method.name) && desc.equals(method.desc)) {
-							assert isPresent("minecraft", ">=1.18-rc.1");
-							Mixins.addConfiguration("optifabric.compat.fabric-rendering-data.bonus-mixins.json");
-							break;
-						}
-					}
-				});
-			} else if (isPresent("fabric-rendering-data-attachment-v1", ">0.2.0")) {
-				//Below 0.43.1 and with a patch to ChunkRendererRegion
-				injector.predictFuture(RemappingUtils.getClassName("class_853")).ifPresent(node -> {//ChunkRendererRegion, (World, BlockPos, BlockPos)ChunkRendererRegion
-					String desc = RemappingUtils.mapMethodDescriptor("(Lnet/minecraft/class_1937;Lnet/minecraft/class_2338;Lnet/minecraft/class_2338;IZ)Lnet/minecraft/class_853;");
-
-					for (MethodNode method : node.methods) {
-						if ("generateCache".equals(method.name) && desc.equals(method.desc)) {
-							assert isPresent("minecraft", ">=1.18-beta.1");
-							Mixins.addConfiguration("optifabric.compat.fabric-rendering-data.extra-mixins.json");
-							break;
-						}
-					}
-				});
-			}
 		}
 
 		if (isPresent("fabric-renderer-indigo")) {
@@ -219,7 +174,7 @@ public class OptifabricSetup implements Runnable {
 			} else if (isPresent("minecraft", ">=1.19.3")) {
 				Mixins.addConfiguration("optifabric.compat.fabric-screen-api.newerer-mixins.json");
 			} else if (isPresent("minecraft", ">=1.17-alpha.21.10.a")) {
-				if (farPlanePresent.getAsBoolean()) {
+				if (farPlanePresent) {
 					Mixins.addConfiguration("optifabric.compat.fabric-screen-api.newer-mixins.json");
 				} else {
 					Mixins.addConfiguration("optifabric.compat.fabric-screen-api.new-mixins.json");
@@ -245,7 +200,7 @@ public class OptifabricSetup implements Runnable {
 			// no mixins are needed -- cloth had a workaround for https://github.com/FabricMC/Mixin/issues/80
 			// but it is now fixed in fabricloader
 		} else if (isPresent("cloth-client-events-v0", ">=2.0")) {
-			if (farPlanePresent.getAsBoolean()) {
+			if (farPlanePresent) {
 				Mixins.addConfiguration("optifabric.compat.cloth.newer-mixins.json");
 			} else {
 				Mixins.addConfiguration("optifabric.compat.cloth.new-mixins.json");
@@ -291,7 +246,7 @@ public class OptifabricSetup implements Runnable {
 		if (isPresent("apoli", ">=2.3.1")) {
 			Mixins.addConfiguration("optifabric.compat.apoli-newerer.mixins.json");
 
-			if (setupFogPresent.getAsBoolean()) {
+			if (setupFogPresent) {
 				Mixins.addConfiguration("optifabric.compat.apoli-newerer.extra-mixins.json");
 			}
 		} else if (isPresent("apoli", ">=2.2.2")) {
@@ -302,7 +257,7 @@ public class OptifabricSetup implements Runnable {
 			Mixins.addConfiguration("optifabric.compat.apoli.mixins.json");
 		}
 
-		if (isPresent("additionalentityattributes") && setupFogPresent.getAsBoolean()) {
+		if (isPresent("additionalentityattributes") && setupFogPresent) {
 			Mixins.addConfiguration("optifabric.compat.additional-entity-attributes.mixins.json");
 		}
 
@@ -329,7 +284,7 @@ public class OptifabricSetup implements Runnable {
 				Mixins.addConfiguration("optifabric.compat.carpet.mixins.json");
 			}
 
-			if (particlesPresent.getAsBoolean()) {
+			if (particlesPresent) {
 				if (isPresent("minecraft", ">=1.18.2")) {
 					Mixins.addConfiguration("optifabric.compat.carpet.extra-new-mixins.json");
 				} else {
@@ -414,7 +369,7 @@ public class OptifabricSetup implements Runnable {
 			Mixins.addConfiguration("optifabric.compat.architectury-AB.newerer-mixins.json");
 		} else if (isPresent("architectury", ">=2.0")) {
 			assert isPresent("minecraft", ">=1.17-beta.1");
-			if (farPlanePresent.getAsBoolean()) {
+			if (farPlanePresent) {
 				Mixins.addConfiguration("optifabric.compat.architectury-AB.newer-mixins.json");
 			} else {
 				Mixins.addConfiguration("optifabric.compat.architectury-AB.new-mixins.json");
@@ -475,7 +430,7 @@ public class OptifabricSetup implements Runnable {
 			}
 		}
 
-		if (isPresent("cullparticles") && particlesPresent.getAsBoolean()) {
+		if (isPresent("cullparticles") && particlesPresent) {
 			Mixins.addConfiguration("optifabric.compat.cullparticles.mixins.json");
 		}
 
@@ -538,11 +493,11 @@ public class OptifabricSetup implements Runnable {
 		}
 	}
 
-	private static boolean isPresent(String modID) {
+	public static boolean isPresent(String modID) {
 		return FabricLoader.getInstance().isModLoaded(modID);
 	}
 
-	static boolean isPresent(String modID, String versionRange) {
+	public static boolean isPresent(String modID, String versionRange) {
 		return isPresent(modID, modMetadata -> compareVersions(versionRange, modMetadata));
 	}
 

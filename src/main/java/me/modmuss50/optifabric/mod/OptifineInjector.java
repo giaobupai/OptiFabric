@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import me.modmuss50.optifabric.util.RemappingUtils;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
@@ -29,6 +30,12 @@ public class OptifineInjector {
 
 	public OptifineInjector(ClassCache classCache) {
 		this.classCache = classCache;
+	}
+
+	public boolean isMethodPresent(String owner, String name, String desc) {
+		String remappedDesc = RemappingUtils.mapMethodDescriptor(desc);
+		return predictFuture(RemappingUtils.getClassName(owner)).filter(node -> node.methods.stream().anyMatch(
+				methodNode -> name.equals(methodNode.name) && remappedDesc.equals(methodNode.desc))).isPresent();
 	}
 
 	public Optional<ClassNode> predictFuture(String className) {
