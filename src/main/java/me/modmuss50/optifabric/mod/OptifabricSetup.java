@@ -29,8 +29,11 @@ import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.util.version.SemanticVersionImpl;
 import net.fabricmc.loader.util.version.SemanticVersionPredicateParser;
 
+import me.modmuss50.optifabric.compat.MixinFixerExtension;
+import me.modmuss50.optifabric.compat.OptifabricMixinErrorHandler;
 import me.modmuss50.optifabric.mod.OptifineVersion.JarType;
 import me.modmuss50.optifabric.patcher.ClassCache;
+import me.modmuss50.optifabric.util.MixinInternals;
 import me.modmuss50.optifabric.util.RemappingUtils;
 
 import com.chocohead.mm.api.ClassTinkerers;
@@ -48,6 +51,9 @@ public class OptifabricSetup implements Runnable {
 	//This is called early on to allow us to get the transformers in before minecraft starts
 	@Override
 	public void run() {
+		MixinInternals.registerExtension(new MixinFixerExtension());
+		Mixins.registerErrorHandlerClass(OptifabricMixinErrorHandler.class.getName());
+
 		OptifineInjector injector;
 		try {
 			Pair<File, ClassCache> runtime = OptifineSetup.getRuntime();
