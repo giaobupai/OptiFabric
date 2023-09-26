@@ -172,25 +172,6 @@ public class OptifabricSetup implements Runnable {
 			Mixins.addConfiguration("optifabric.compat.fabric-item-api.mixins.json");
 		}
 
-		if (isPresent("fabric-screen-api-v1")) {
-			if (isPresent("minecraft", ">=1.20")) {
-				Mixins.addConfiguration("optifabric.compat.fabric-screen-api.new4er-mixins.json");
-			} else if (isPresent("fabric-api", ">=0.81.0")) {
-				Mixins.addConfiguration("optifabric.compat.fabric-screen-api.new3er-mixins.json");
-			} else if (isPresent("minecraft", ">=1.19.3")) {
-				Mixins.addConfiguration("optifabric.compat.fabric-screen-api.newerer-mixins.json");
-			} else if (isPresent("minecraft", ">=1.17-alpha.21.10.a")) {
-				if (farPlanePresent) {
-					Mixins.addConfiguration("optifabric.compat.fabric-screen-api.newer-mixins.json");
-				} else {
-					Mixins.addConfiguration("optifabric.compat.fabric-screen-api.new-mixins.json");
-				}
-			} else {
-				Mixins.addConfiguration("optifabric.compat.fabric-screen-api.mixins.json");
-			}
-			usingScreenAPI = true;
-		}
-
 		if (isPresent("fabric-lifecycle-events-v1", ">=1.4.6") && isPresent("minecraft", "1.17.x")) {
 			Mixins.addConfiguration("optifabric.compat.fabric-lifecycle-events.mixins.json");
 		} else if (isPresent("fabric-lifecycle-events-v1", ">=2.0.8")) {
@@ -200,19 +181,6 @@ public class OptifabricSetup implements Runnable {
 		Mixins.addConfiguration("optifabric.optifine.mixins.json");
 		if (OptifabricSetup.isPresent("minecraft", "<=1.19.2")) {
 			Mixins.addConfiguration("optifabric.optifine.old-mixins.json");
-		}
-
-		if (isPresent("fabricloader", ">=0.13.0") && (isPresent("cloth-client-events-v0", ">=3.1.58") || isPresent("cloth-client-events-v0", ">=2.1.60 <3.0") || isPresent("cloth-client-events-v0", ">=1.6.59 <2.0"))) {
-			// no mixins are needed -- cloth had a workaround for https://github.com/FabricMC/Mixin/issues/80
-			// but it is now fixed in fabricloader
-		} else if (isPresent("cloth-client-events-v0", ">=2.0")) {
-			if (farPlanePresent) {
-				Mixins.addConfiguration("optifabric.compat.cloth.newer-mixins.json");
-			} else {
-				Mixins.addConfiguration("optifabric.compat.cloth.new-mixins.json");
-			}
-		} else if (isPresent("cloth-client-events-v0")) {
-			Mixins.addConfiguration("optifabric.compat.cloth.mixins.json");
 		}
 
 		if (isPresent("clothesline")) {
@@ -327,30 +295,6 @@ public class OptifabricSetup implements Runnable {
 			Mixins.addConfiguration("optifabric.compat.age-of-exile.mixins.json");
 		}
 
-		if (isPresent("charm", ">=2.0 <2.1")) {
-			Mixins.addConfiguration("optifabric.compat.charm-older.mixins.json");
-		} else if (isPresent("charm", ">=2.1 <3.0")) {
-			Mixins.addConfiguration("optifabric.compat.charm-old.mixins.json");
-
-			if (isPresent("charm", ">=2.2.2")) {
-				injector.predictFuture(RemappingUtils.getClassName("class_156")).ifPresent(node -> {//Util
-					String desc = "(Lcom/mojang/datafixers/DSL$TypeReference;Ljava/lang/String;)Lcom/mojang/datafixers/types/Type;";
-					String getChoiceTypeInternal = RemappingUtils.getMethodName("class_156", "method_29191", desc); //Util, getChoiceTypeInternal
-
-					for (MethodNode method : node.methods) {
-						if (getChoiceTypeInternal.equals(method.name) && desc.equals(method.desc)) {
-							Mixins.addConfiguration("optifabric.compat.charm-plus.mixins.json");
-							break;
-						}
-					}
-				});
-			}
-		} else if (isPresent("charm", ">=3.0 <4.0")) {
-			Mixins.addConfiguration("optifabric.compat.charm.mixins.json");
-		} else if (isPresent("charm", ">=4.0")) {
-			Mixins.addConfiguration("optifabric.compat.charm-new.mixins.json");
-		}
-
 		if (isPresent("voxelmap")) {
 			Mixins.addConfiguration("optifabric.compat.voxelmap.mixins.json");
 		}
@@ -365,25 +309,6 @@ public class OptifabricSetup implements Runnable {
 			Mixins.addConfiguration("optifabric.compat.images-old.mixins.json");
 		} else if (isPresent("images", ">=1.0.1")) {
 			Mixins.addConfiguration("optifabric.compat.images.mixins.json");
-		}
-
-		if (isPresent("architectury", ">=9.0.6")) {
-			Mixins.addConfiguration("optifabric.compat.architectury-AB.new4er-mixins.json");
-		} else if (isPresent("architectury", ">=7.0.52")) {
-			Mixins.addConfiguration("optifabric.compat.architectury-AB.newererer-mixins.json");
-		} else if (isPresent("architectury", ">=3.7")) {
-			Mixins.addConfiguration("optifabric.compat.architectury-AB.newerer-mixins.json");
-		} else if (isPresent("architectury", ">=2.0")) {
-			assert isPresent("minecraft", ">=1.17-beta.1");
-			if (farPlanePresent) {
-				Mixins.addConfiguration("optifabric.compat.architectury-AB.newer-mixins.json");
-			} else {
-				Mixins.addConfiguration("optifabric.compat.architectury-AB.new-mixins.json");
-			}
-		} else if (isPresent("architectury", ">=1.0.20")) {
-			Mixins.addConfiguration("optifabric.compat.architectury-B.mixins.json");
-		} else if (isPresent("architectury", ">=1.0.4")) {
-			Mixins.addConfiguration("optifabric.compat.architectury-A.mixins.json");
 		}
 
 		if (isPresent("frex", ">=4.3")) {

@@ -2,7 +2,7 @@ package me.modmuss50.optifabric.compat;
 
 import com.google.common.collect.Lists;
 import me.modmuss50.optifabric.compat.fix.IMixinFixer;
-import me.modmuss50.optifabric.mod.OptifabricSetup;
+import me.modmuss50.optifabric.patcher.fixes.ClassFixer;
 import me.modmuss50.optifabric.util.MixinInternals;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -11,7 +11,6 @@ import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Slice;
-import org.spongepowered.asm.mixin.injection.Surrogate;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.struct.InjectionInfo;
@@ -83,43 +82,6 @@ public class MixinNodeTransformer {
 	}
 
 	/**
-	 * Creates a {@link Surrogate} that calls the specified injector using the given
-	 * parameter indices. The surrogate <b>must</b> include all the parameters of
-	 * the original injector (regardless of order). Logs a warning if no
-	 * method annotated with {@link Inject} matching the given name is found in the
-	 * {@link MixinNodeTransformer#mixinNode}.
-	 * <p>A parameter index refers to the index of the type in the array
-	 * obtained via {@link Type#getArgumentTypes(String desc)}. The {@code this}
-	 * reference for non-static injectors and "wide" types are automatically
-	 * handled.</p>
-	 * @param name name of the orphaned injector
-	 * @param desc descriptor of the surrogate
-	 * @param params indices of the parameters that will be passed
-	 *                  to the injector
-	 */
-	public void placeSurrogate(String name, String desc, int[] params) {
-		Optional<MethodNode> optional = mixinNode.methods.stream()
-				.filter(method -> name.equals(method.name) && Annotations.getVisible(method, Inject.class) != null)
-				.findFirst();
-		if (!optional.isPresent()) {
-			OptifabricSetup.LOGGER.warn("Could not find injector method {} in {}, skipping", name, mixinInfo);
-			return;
-		}
-		MethodNode method = optional.get();
-		MethodNode surrogate = new MethodNode(method.access, method.name, desc, null, method.exceptions.toArray(new String[0]));
-		Annotations.setVisible(surrogate, Surrogate.class);
-		Type[] args = Type.getArgumentTypes(desc);
-		for (int i : params) {
-			surrogate.instructions.add(new VarInsnNode(args[i].getOpcode(Opcodes.IALOAD), i));
-		}
-		boolean isStatic = Modifier.isStatic(method.access);
-		boolean isPrivate = Modifier.isPrivate(method.access);
-		int invokeOpcode = isStatic ? Opcodes.INVOKESTATIC : isPrivate ? Opcodes.INVOKESPECIAL : Opcodes.INVOKEVIRTUAL;
-		surrogate.instructions.add(new MethodInsnNode(invokeOpcode, mixinInfo.getClassRef(), method.name, method.desc));
-		surrogate.instructions.add(new InsnNode(Opcodes.RETURN));
-	}
-
-	/**
 	 * An abstraction over raw ASM that aids in patching
 	 * methods from another mod's mixin.
 	 */
@@ -165,6 +127,24 @@ public class MixinNodeTransformer {
 				Annotations.setValue(injector, "method", Arrays.asList(method));
 				Annotations.setValue(injector, "remap", false);
 				updateClassInfo = true;
+			}
+
+			/**
+			 * Sets the {@code at} key of the injector. If the
+			 * injector takes an array of {@link At}s the array
+			 * will be replaced with one that contains only the
+			 * given {@code at}. Use only if a {@link ClassFixer}
+			 * can't (or shouldn't) be used.
+			 * @param atNode {@link AtNode} that constructs an {@link At}
+			 *             annotation from the given {@code value} and {@code target}
+			 */
+			public void setAt(AtNode atNode) {
+				Object at = Annotations.getValue(injector, "at");
+				if (at instanceof AnnotationNode) {
+					Annotations.setValue(injector, "at", atNode.at);
+				} else if (at instanceof Collection) {
+					Annotations.setValue(injector, "at", Collections.singletonList(atNode.at));
+				}
 			}
 
 			/**

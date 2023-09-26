@@ -1,8 +1,0 @@
-{
-	"parent": "optifabric.mixins.json",
-	"package": "me.modmuss50.optifabric.compat.fabricscreenapi.mixin",
-	"plugin": "me.modmuss50.optifabric.compat.InterceptingMixinPlugin",
-	"mixins": [
-		"GameRendererNewMixin"
-	]
-}

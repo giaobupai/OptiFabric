@@ -12,8 +12,12 @@ public class ModMixinFixer {
 	private final List<IMixinFixer> classFixes = new ArrayList<>();
 
 	private ModMixinFixer() {
+		addFixer(new BlockEntityRenderDispatcherMixinFixer());
+		addFixer(new CharmUtilMixinFixer());
 		addFixer(new ChunkRendererRegionMixinFixer());
+		addFixer(new GameRendererMixinFixer());
 		addFixer(new ModelLoaderBakerImplFixer());
+		addFixer(new TextureAtlasMixinFixer());
 	}
 
 	public void addFixer(IMixinFixer fixer) {
