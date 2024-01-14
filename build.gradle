@@ -5,13 +5,23 @@ buildscript {
 			url = 'https://maven.fabricmc.net/'
 		}
 		mavenCentral()
+		gradlePluginPortal()
 		maven { 
 			name = "Jitpack"
 			url 'https://jitpack.io/'
 		}
 	}
 	dependencies {
-		classpath 'com.github.Chocohead.Fabric-Loom:fabric-loom:0d0261a'
+		classpath 'org.ow2.asm:asm:9.6'
+		classpath 'com.github.Chocohead.Fabric-Loom:fabric-loom:2fc5f55'
+		classpath 'com.github.johnrengelman.shadow:com.github.johnrengelman.shadow.gradle.plugin:4.0.4'
+		if (gradle.gradleVersion.tokenize('.' as char)[0].toInteger() <= 6) {
+			classpath('com.guardsquare:proguard-gradle:7.0.1') {
+				exclude group: 'com.android.tools.build'
+			}
+		} else {
+			classpath "com.guardsquare:proguard-gradle:${JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_11) ? '7.4.0' : '7.1.0'}"
+		}
 	}
 }
 
@@ -30,6 +40,15 @@ repositories {
 	maven { url 'https://jitpack.io' }
 }
 
+configurations {
+	shadow {
+		transitive = false
+	}
+	implementation {
+		extendsFrom shadow
+	}
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
@@ -37,6 +56,7 @@ dependencies {
 
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
+	shadow "net.fabricmc:tiny-remapper:${project.tiny_remapper_version}"
 	modImplementation "com.github.Chocohead:Fabric-ASM:${project.fabric_asm_version}"
 	include "com.github.Chocohead:Fabric-ASM:${project.fabric_asm_version}"
 }
@@ -74,6 +94,7 @@ compileJava {
 		classes += ['net/minecraft/class_5944': 'net/minecraft/class_5944']
 		method 'net/minecraft/class_5944', '(Lnet/minecraft/class_5912;Lnet/minecraft/util/Identifier;Lnet/minecraft/client/render/VertexFormat;)V', '<init>', '<init>'
 		method 'net/minecraft/client/gui/screen/Screen', '(Lnet/minecraft/class_332;IIF)V', 'renderWithTooltip', 'method_47413'
+		classes += ['net/minecraft/class_7775': 'net/minecraft/class_7775']
 	}
 }
 
@@ -114,6 +135,107 @@ task sourcesJar(type: Jar, dependsOn: classes) {
 
 jar {
 	from "LICENSE"
+	classifier = 'dev'
+}
+
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+task fatJar(type: ShadowJar, dependsOn: jar) {
+	from jar.outputs.files
+
+	classifier = 'fat'
+	configurations = [project.configurations.shadow]
+
+	relocate 'net.fabricmc.tinyremapper', 'me.modmuss50.optifabric.shadow.tinyremapper'
+}
+
+File proguardFile = file("$buildDir/libs/optifabric-${version}-shrink.jar")
+
+import proguard.gradle.ProGuardTask
+task proguardJar(type: ProGuardTask, dependsOn: fatJar) {
+	inputs.files(fatJar, project.configurations.compileClasspath)
+	outputs.files(proguardFile)
+
+	doFirst {
+		sourceSets.main.compileClasspath.forEach {
+			//Some of the Mixin launch classes are compiled with Java 16, which ProGuard doesn't appreciate
+			libraryjars([filter: '!org/spongepowered/asm/launch/**.class,!module-info.class'], it)
+		}
+	}
+
+	libraryjars JavaVersion.current().java9Compatible ? "${System.getProperty('java.home')}/jmods" : "${System.getProperty('java.home')}/lib/rt.jar"
+
+	injars fatJar.archivePath
+	outjars proguardFile
+	configuration file('proguard.conf')
+}
+
+import org.zeroturnaround.zip.ZipUtil;
+import org.zeroturnaround.zip.transform.ZipEntryTransformerEntry;
+import org.zeroturnaround.zip.transform.StringZipEntryTransformer;
+import java.util.zip.ZipEntry;
+import net.fabricmc.loom.util.NestedJars
+import com.google.gson.JsonObject
+task modJar(type: Jar, dependsOn: proguardJar) {
+	from zipTree(proguardFile).matching {
+		exclude 'me/modmuss50/optifabric/shadow/**'
+	}
+	classifier = 'thin'
+
+	doLast {
+		ZipUtil.transformEntry(archivePath, new ZipEntryTransformerEntry('fabric.mod.json', new StringZipEntryTransformer() {
+			@Override
+			String transform(ZipEntry zipEntry, String input) {
+				def json = NestedJars.GSON.fromJson(input, JsonObject.class)
+				json.getAsJsonObject('depends').addProperty('optifabric-libs', "${version}")
+				return NestedJars.GSON.toJson(json)
+			}
+		}))
+	}
+}
+
+task libraryJar(type: Jar, dependsOn: proguardJar) {
+	from zipTree(proguardFile).matching {
+		include 'me/modmuss50/optifabric/shadow/**'
+	}
+	classifier = 'libs'
+
+	doLast {
+		ZipUtil.addEntry(archivePath, 'fabric.mod.json', """\
+		{
+			"schemaVersion": 1,
+			"id": "optifabric-libs",
+			"version": "${version}",
+		
+			"name": "OptiFabric Libraries",
+			"description": "Shadowed libraries included within OptiFabric",
+			"authors": [
+				"Chocohead",
+				"Tiny-Remapper contributors"
+			],
+			"contact": {
+				"sources": "https://github.com/Chocohead/OptiFabric",
+				"issues": "https://github.com/Chocohead/OptiFabric/issues"
+			},
+			"license": "LGPL-3.0",
+			"environment": "client",
+			"custom": {
+				"modmenu:api": true,
+				"modmenu": {
+					"badges": ["library"]
+				}
+			}
+		}""".stripIndent().getBytes('UTF-8'));
+	}
+}
+
+remapJar {
+	dependsOn 'modJar', 'libraryJar'
+	input.set modJar.archivePath
+	classifier = ''
+
+	doLast {
+		NestedJars.addJars(archivePath, [libraryJar.archivePath])
+	}
 }
 
 publishing {

@@ -63,7 +63,7 @@ public class ClassCache {
 	public static ClassCache read(File input) throws IOException {
 		try (DataInputStream dis = new DataInputStream(new GZIPInputStream(new FileInputStream(input)))) {
 			char formatRevision = dis.readChar(); //Check the format of the file
-			if (formatRevision != 'D') return new ClassCache(null);
+			if (formatRevision != 'E') return new ClassCache(null);
 
 			long expectedCRC = dis.readLong();
 
@@ -98,7 +98,7 @@ public class ClassCache {
 		}
 
 		try (DataOutputStream dos = new DataOutputStream(new GZIPOutputStream(new FileOutputStream(output)))) {
-			dos.writeChar('D'); //Format version
+			dos.writeChar('E'); //Format version
 			dos.writeLong(calculateCRC()); //Expected CRC to get from fully reading
 
 			//Write the hash
