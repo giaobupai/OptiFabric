@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import me.modmuss50.optifabric.util.RemappingUtils;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
@@ -31,6 +32,12 @@ public class OptifineInjector {
 		this.classCache = classCache;
 	}
 
+	public boolean isMethodPresent(String owner, String name, String desc) {
+		String remappedDesc = RemappingUtils.mapMethodDescriptor(desc);
+		return predictFuture(RemappingUtils.getClassName(owner)).filter(node -> node.methods.stream().anyMatch(
+				methodNode -> name.equals(methodNode.name) && remappedDesc.equals(methodNode.desc))).isPresent();
+	}
+
 	public Optional<ClassNode> predictFuture(String className) {
 		byte[] bytes = classCache.getClass(className);
 		return bytes != null ? Optional.of(ASMUtils.readClass(bytes)) : Optional.empty();
@@ -40,7 +47,7 @@ public class OptifineInjector {
 		Consumer<ClassNode> transformer = target -> {
 			//Avoid double patching things, not that this should happen
 			if (!patched.add(target.name)) {
-				System.err.println("Already patched " + target.name);
+				OptifabricSetup.LOGGER.error("Already patched " + target.name);
 				return;
 			}
 
